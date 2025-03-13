@@ -50,17 +50,25 @@ def update_env_files(project_name, postgres_port, redis_port, kafka_port):
     """Update environment files with new project name and ports."""
     # Update .env.base
     base_replacements = {
-        'SQL_DATABASE="fastapitemplate"': f'SQL_DATABASE="{project_name}"'
+        'FASTAPITEMPLATE_SQL_DATABASE="fastapitemplate"': f'{project_name.upper()}_SQL_DATABASE="{project_name}"',
+        'FASTAPITEMPLATE_': f'{project_name.upper()}_'
     }
     replace_in_file('.env.base', base_replacements)
     
     # Update .env.dev
     dev_replacements = {
-        'SQL_PORT=30000': f'SQL_PORT={postgres_port}',
-        'REDIS_PORT=30001': f'REDIS_PORT={redis_port}',
-        'KAFKA_PORT="9092"': f'KAFKA_PORT="{kafka_port}"'
+        'FASTAPITEMPLATE_SQL_PORT=30000': f'{project_name.upper()}_SQL_PORT={postgres_port}',
+        'FASTAPITEMPLATE_REDIS_PORT=30001': f'{project_name.upper()}_REDIS_PORT={redis_port}',
+        'FASTAPITEMPLATE_KAFKA_PORT="9092"': f'{project_name.upper()}_KAFKA_PORT="{kafka_port}"',
+        'FASTAPITEMPLATE_': f'{project_name.upper()}_'
     }
     replace_in_file('.env.dev', dev_replacements)
+    
+    # Update .env.prod
+    prod_replacements = {
+        'FASTAPITEMPLATE_': f'{project_name.upper()}_'
+    }
+    replace_in_file('.env.prod', prod_replacements)
 
 
 def update_server_title(project_name):
@@ -89,6 +97,45 @@ def update_server_title(project_name):
     print(f"Updated {file_path}")
 
 
+def update_env_py(project_name):
+    """Update the env.py file to use the new project prefix."""
+    file_path = 'env.py'
+    if not os.path.exists(file_path):
+        print(f"Warning: File {file_path} does not exist. Skipping.")
+        return
+    
+    with open(file_path, 'r') as file:
+        content = file.read()
+    
+    # Replace the default prefix with the new project prefix
+    pattern = r'return "FASTAPITEMPLATE_"  # Default prefix if not found'
+    replacement = f'return "{project_name.upper()}_"  # Default prefix if not found'
+    content = re.sub(pattern, replacement, content)
+    
+    with open(file_path, 'w') as file:
+        file.write(content)
+    
+    print(f"Updated {file_path}")
+
+
+def update_alembic_readme():
+    """Update the alembic README file to mention the customized project."""
+    file_path = 'alembic/README'
+    if not os.path.exists(file_path):
+        print(f"Warning: File {file_path} does not exist. Skipping.")
+        return
+    
+    with open(file_path, 'r') as file:
+        content = file.read()
+    
+    # Add a note about the customized project
+    if "This is a customized project" not in content:
+        new_content = content + "\n\nThis is a customized project using the FastAPI template.\n"
+        with open(file_path, 'w') as file:
+            file.write(new_content)
+        print(f"Updated {file_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description='Setup FastAPI project with custom name and ports.')
     parser.add_argument('--name', type=str, help='Project name (default: fastapi_project)')
@@ -115,6 +162,8 @@ def main():
     update_docker_compose(project_name, postgres_port, redis_port, pgadmin_port, kafka_port)
     update_env_files(project_name, postgres_port, redis_port, kafka_port)
     update_server_title(project_name)
+    update_env_py(project_name)
+    update_alembic_readme()
     
     print("\nProject setup complete!")
     print(f"\nTo start your project, run:")

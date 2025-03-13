@@ -58,6 +58,8 @@ This script will:
 1. Replace all occurrences of "fastapitemplate" with your custom project name
 2. Update port configurations to avoid conflicts
 3. Update the API title and welcome message
+4. Update database configuration in alembic migrations
+5. Use unique environment variable prefixes to prevent conflicts between projects
 
 ### Manual Setup
 
@@ -185,22 +187,24 @@ app.include_router(my_service_router, prefix="/my-service", tags=["my-service"])
 
 The application uses environment variables for configuration. You can set these in a `.env.dev` file for development.
 
-Required variables:
+> **Note:** After running the setup script, all environment variables will be prefixed with your project name in uppercase followed by an underscore (e.g., `MYPROJECT_SQL_HOST` instead of `SQL_HOST`). This prevents conflicts when running multiple projects on the same machine.
+
+Required variables (shown with default prefix `FASTAPITEMPLATE_`):
 
 - `FASTAPI_ENV`: Environment (dev, prod)
-- `SQL_HOST`: PostgreSQL host
-- `SQL_PORT`: PostgreSQL port
-- `SQL_USER`: PostgreSQL user
-- `SQL_PASSWORD`: PostgreSQL password
-- `SQL_DATABASE`: PostgreSQL database
-- `REDIS_HOST`: Redis host
-- `REDIS_PORT`: Redis port
-- `KAFKA_HOST`: Kafka host
-- `KAFKA_PORT`: Kafka port
-- `AUTH_SECRET_KEY`: Secret key for JWT tokens
-- `AUTH_ALGORITHM`: Algorithm for JWT tokens (e.g., HS256)
-- `AUTH_ACCESS_TOKEN_EXPIRE_MINUTES`: JWT token expiration in minutes
+- `FASTAPITEMPLATE_SQL_HOST`: PostgreSQL host
+- `FASTAPITEMPLATE_SQL_PORT`: PostgreSQL port
+- `FASTAPITEMPLATE_SQL_USER`: PostgreSQL user
+- `FASTAPITEMPLATE_SQL_PASSWORD`: PostgreSQL password
+- `FASTAPITEMPLATE_SQL_DATABASE`: PostgreSQL database
+- `FASTAPITEMPLATE_REDIS_HOST`: Redis host
+- `FASTAPITEMPLATE_REDIS_PORT`: Redis port
+- `FASTAPITEMPLATE_KAFKA_HOST`: Kafka host
+- `FASTAPITEMPLATE_KAFKA_PORT`: Kafka port
+- `FASTAPITEMPLATE_AUTH_SECRET_KEY`: Secret key for JWT tokens
+- `FASTAPITEMPLATE_AUTH_ALGORITHM`: Algorithm for JWT tokens (e.g., HS256)
+- `FASTAPITEMPLATE_AUTH_ACCESS_TOKEN_EXPIRE_MINUTES`: JWT token expiration in minutes
 
 Optional variables:
 
-- `ANTHROPIC_API_KEY`: Anthropic API key for LLM integration
+- `FASTAPITEMPLATE_ANTHROPIC_API_KEY`: Anthropic API key for LLM integration

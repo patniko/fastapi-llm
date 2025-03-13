@@ -1,4 +1,5 @@
 import os
+import re
 from functools import lru_cache
 
 from loguru import logger
@@ -8,11 +9,25 @@ from pydantic_settings import SettingsConfigDict
 APP_ENV = os.environ.get("FASTAPI_ENV", "prod")
 logger.info(f"Running with FASTAPI_ENV: {APP_ENV}")
 
+# Determine the project name from environment variables
+# Look for any environment variable with _SQL_DATABASE suffix
+def get_project_prefix():
+    for key in os.environ:
+        if key.endswith('_SQL_DATABASE'):
+            return key.replace('_SQL_DATABASE', '_')
+    return "FASTAPITEMPLATE_"  # Default prefix if not found
+
+PROJECT_PREFIX = get_project_prefix()
+logger.info(f"Using project prefix: {PROJECT_PREFIX}")
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(".env.base", f".env.{APP_ENV}"), extra="ignore"
+        env_file=(".env.base", f".env.{APP_ENV}"),
+        env_prefix=PROJECT_PREFIX,
+        extra="ignore"
     )
+    
     auth_secret_key: str | None = None
     auth_algorithm: str | None = None
     auth_access_token_expire_minutes: int | None = None
