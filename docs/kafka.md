@@ -385,7 +385,7 @@ kafka:
     volumes:
         - kafka-data:/var/lib/kafka/data
     networks:
-        - fastapi-net
+        - fastapitemplate-net
     command: |
         bash -c '
         echo "Generating cluster ID..."

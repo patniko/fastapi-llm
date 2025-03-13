@@ -2,7 +2,7 @@
 
 # A unique name for the app. Must be lowercase alphanumeric characters. Changing the name destroys data associated
 # with the app.
-name: 'fastapi'
+name: 'fastapitemplate'
 
 # The runtime the application uses.
 # Complete list of available runtimes: https://docs.platform.sh/create-apps/app-reference.html#types

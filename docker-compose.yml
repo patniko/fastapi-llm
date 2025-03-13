@@ -6,10 +6,10 @@ services:
             - 30000:5432
         environment:
             - POSTGRES_USER=main
-            - POSTGRES_DB=main
+            - POSTGRES_DB=fastapitemplate
             - POSTGRES_PASSWORD=main
         networks:
-            - fastapi-net
+            - fastapitemplate-net
     pgadmin:
         image: dpage/pgadmin4
         environment:
@@ -21,7 +21,7 @@ services:
             - ./pgadmin4/servers.json:/pgadmin4/servers.json
             - ./pgadmin4/pgpassfile:/pgadmin4/pgpass
         networks:
-            - fastapi-net
+            - fastapitemplate-net
         entrypoint: >
             sh -c "
             cp -f /pgadmin4/pgpass /var/lib/pgadmin;
@@ -39,7 +39,7 @@ services:
             - ./data:/data
         restart: always
         networks:
-            - fastapi-net
+            - fastapitemplate-net
     kafka:
         image: confluentinc/cp-kafka:7.5.0
         hostname: kafka
@@ -67,7 +67,7 @@ services:
         volumes:
             - kafka-data:/var/lib/kafka/data
         networks:
-            - fastapi-net
+            - fastapitemplate-net
         command: |
             bash -c '
             echo "Generating cluster ID..."
@@ -79,7 +79,7 @@ services:
             exec /etc/confluent/docker/run
             '
 networks:
-    fastapi-net:
+    fastapitemplate-net:
         driver: bridge
 
 volumes:
