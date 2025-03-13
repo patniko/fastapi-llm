@@ -33,13 +33,8 @@ from db import get_db
 from env import get_settings
 from memcache import get_cached_data
 from memcache import set_cached_data
-from models import Contact
 from models import DeviceToken
-from models import Hash
 from models import User
-from models import WeeklyScore
-from notify import NotificationEvents, create_notification, delete_device_token
-from notify import register_device_token
 
 router = APIRouter()
 
@@ -49,14 +44,12 @@ class SmsVerify(BaseModel):
     phone: str
     code: str
 
-
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str
     user_id: int
     expires_in: int  # Access token expiration in seconds
-
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
@@ -141,26 +134,6 @@ class DeviceTokenResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
-
-
-class WeeklyScoreResponse(BaseModel):
-    current_weekly_score: int
-    current_target: int
-
-
-class UserRecommendationsResponse(BaseModel):
-    id: int
-    first_name: str
-    last_name: Optional[str]
-    recommendations: Optional[List[str]] = None
-
-    model_config = {"from_attributes": True}
-
-
-class FriendConnectionResponse(BaseModel):
-    success: bool
-    message: str
-
 
 class PasswordUpdate(BaseModel):
     current_password: Optional[str] = None  # Optional for users without password
@@ -589,85 +562,6 @@ async def upload_image(
         logger.error(f"Unexpected error in upload_image: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-
-@router.get("/me/hashes", response_model=UserHashes)
-async def get_user_hashes(
-    db: Session = Depends(get_db), user: dict = Depends(validate_jwt)
-):
-    try:
-        db_user = get_user_by_id(db, user_id=user["user_id"])
-        if not db_user:
-            raise HTTPException(status_code=404, detail="No user found")
-
-        user_id: int = db_user.id
-        hash_records = (
-            db.query(Hash)
-            .filter(Hash.user_id == user_id)
-            .with_entities(Hash.key_name, Hash.value)
-            .all()
-        )
-
-        hashes: Dict[str, str] = {
-            record.key_name: record.value for record in hash_records
-        }
-
-        response = UserHashes(
-            contacts_hash=hashes.get("contacts_hash", str(uuid4())),
-            routines_hash=hashes.get("routines_hash", str(uuid4())),
-            catalog_hash=hashes.get("catalog_hash", str(uuid4())),
-        )
-
-        return response
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error retrieving user hashes: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve user hashes")
-
-
-@router.put("/me/hashes", response_model=UserHashes)
-async def update_user_hashes(
-    hashes: UserHashes,
-    db: Session = Depends(get_db),
-    user: dict = Depends(validate_jwt),
-):
-    try:
-        db_user = get_user_by_id(db, user_id=user["user_id"])
-        if not db_user:
-            raise HTTPException(status_code=404, detail="No user found")
-
-        user_id: int = db_user.id
-        hash_dict = hashes.model_dump()  # Using model_dump instead of dict
-
-        try:
-            for key, value in hash_dict.items():
-                if value:  # Only update if value is provided
-                    db_hash = (
-                        db.query(Hash)
-                        .filter(Hash.user_id == user_id, Hash.key_name == key)
-                        .first()
-                    )
-                    if db_hash:
-                        db_hash.value = value
-                    else:
-                        new_hash = Hash(user_id=user_id, key_name=key, value=value)
-                        db.add(new_hash)
-            db.commit()
-
-        except Exception as e:
-            logger.error(f"Database error updating hashes: {str(e)}")
-            db.rollback()
-            raise HTTPException(status_code=500, detail="Failed to update hashes")
-
-        return await get_user_hashes(user=user, db=db)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating user hashes: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to update user hashes")
-
-
 @router.get("/avatar/{user_id}")
 async def get_avatar(user_id: int, db: Session = Depends(get_db)):
     """Get user avatar with Redis caching and graceful fallback"""
@@ -869,183 +763,6 @@ async def verify_sms(info: SmsVerify, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Unexpected error in verify_sms: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@router.post("/me/device-token", response_model=DeviceTokenResponse)
-async def register_user_device_token(
-    device: DeviceTokenRequest,
-    db: Session = Depends(get_db),
-    user: dict = Depends(validate_jwt),
-):
-    """Register a device token for push notifications"""
-    try:
-        db_user = get_user_by_id(db, user_id=user["user_id"])
-        if not db_user:
-            logger.warning("User not found for device token registration")
-            raise HTTPException(status_code=404, detail="No user found")
-
-        # Register the device token
-        device_token = register_device_token(
-            db, db_user.id, device.token, device.device_type
-        )
-        return DeviceTokenResponse(
-            id=device_token.id,
-            user_id=device_token.user_id,
-            token=device_token.token,
-            device_type=device_token.device_type,
-            created_at=device_token.created_at,
-            updated_at=device_token.updated_at,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error registering device token: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to register device token")
-
-
-@router.delete("/me/device-token/{token}")
-async def remove_user_device_token(
-    token: str, db: Session = Depends(get_db), user: dict = Depends(validate_jwt)
-):
-    """Remove a device token"""
-    try:
-        db_user = get_user_by_id(db, user_id=user["user_id"])
-        if not db_user:
-            logger.warning("User not found for device token removal")
-            raise HTTPException(status_code=404, detail="No user found")
-
-        # Verify the token belongs to the user
-        device = (
-            db.query(DeviceToken)
-            .filter(DeviceToken.token == token, DeviceToken.user_id == db_user.id)
-            .first()
-        )
-        if not device:
-            raise HTTPException(status_code=404, detail="Device token not found")
-
-        # Delete the token
-        if delete_device_token(db, token):
-            return {"message": "Device token removed successfully"}
-        else:
-            raise HTTPException(status_code=404, detail="Device token not found")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error removing device token: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to remove device token")
-
-
-@router.post("/friends/add/{friend_id}", response_model=FriendConnectionResponse)
-async def add_friend(
-    friend_id: int, db: Session = Depends(get_db), user: dict = Depends(validate_jwt)
-):
-    """Create a friend connection between two users"""
-    try:
-        # Get both users
-        current_user = get_user_by_id(db, user_id=user["user_id"])
-        friend_user = get_user_by_id(db, user_id=friend_id)
-
-        if not current_user or not friend_user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        # Create contact entries for both users
-        try:
-            # Add friend as contact for current user
-            friend_contact = Contact(
-                user_id=current_user.id,
-                first_name=friend_user.first_name,
-                last_name=friend_user.last_name,
-                email=friend_user.email,
-                phone=friend_user.phone,
-                picture=friend_user.picture,
-                relation="friend",
-                notes="",
-                summary="You just connected! Add details to build a profile.",
-                connected_user_id=friend_user.id,
-            )
-            db.add(friend_contact)
-
-            # Add current user as contact for friend
-            user_contact = Contact(
-                user_id=friend_user.id,
-                first_name=current_user.first_name,
-                last_name=current_user.last_name,
-                email=current_user.email,
-                phone=current_user.phone,
-                picture=current_user.picture,
-                relation="friend",
-                notes="",
-                summary="You just connected! Add details to build a profile.",
-                connected_user_id=current_user.id,
-            )
-            db.add(user_contact)
-
-            db.commit()
-
-            # Create notifications for both users
-            create_notification(
-                db=db,
-                users=[current_user.id],
-                event=NotificationEvents.CONTACT_LINKED,
-                message=f"You are now connected with {friend_user.first_name}!",
-            )
-            create_notification(
-                db=db,
-                users=[friend_user.id],
-                event=NotificationEvents.CONTACT_LINKED,
-                message=f"You are now connected with {current_user.first_name}!",
-            )
-
-            return FriendConnectionResponse(
-                success=True, message="Friend connection created successfully"
-            )
-
-        except Exception as e:
-            logger.error(f"Database error creating friend connection: {str(e)}")
-            db.rollback()
-            raise HTTPException(
-                status_code=500, detail="Failed to create friend connection"
-            )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error in add_friend: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@router.get("/summary", response_model=WeeklyScoreResponse)
-async def summary(db: Session = Depends(get_db), user: dict = Depends(validate_jwt)):
-    """Get the current weekly score for the authenticated user"""
-    try:
-        db_user = get_user_by_id(db, user_id=user["user_id"])
-        if not db_user:
-            logger.warning("User not found for weekly score lookup")
-            raise HTTPException(status_code=404, detail="No user found")
-        current_score = (
-            db.query(WeeklyScore)
-            .filter(WeeklyScore.user_id == db_user.id)
-            .order_by(WeeklyScore.week_end.desc())
-            .first()
-        )
-
-        # If no score exists, return 0
-        if not current_score:
-            return WeeklyScoreResponse(current_weekly_score=0, current_target=100)
-
-        return WeeklyScoreResponse(
-            current_weekly_score=current_score.score,
-            current_target=current_score.target,
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error retrieving weekly score: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve weekly score")
-
 
 @router.post("/password/set", response_model=TokenResponse)
 async def set_password(
