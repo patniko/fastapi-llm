@@ -38,6 +38,29 @@ This FastAPI Template is built with a modern, scalable architecture consisting o
 The application can be deployed using Platform.sh or any other cloud provider that supports Python applications.
 
 ## Setup
+
+### Quick Setup with Custom Project Name
+
+When you clone this repository, you can use the provided setup script to customize the project name and avoid port conflicts:
+
+```bash
+# Basic usage (generates random ports)
+./setup_project.py --name my_awesome_api
+
+# Custom ports
+./setup_project.py --name my_awesome_api --postgres-port 30100 --redis-port 30101 --pgadmin-port 16600 --kafka-port 9100
+
+# Get help
+./setup_project.py --help
+```
+
+This script will:
+1. Replace all occurrences of "fastapitemplate" with your custom project name
+2. Update port configurations to avoid conflicts
+3. Update the API title and welcome message
+
+### Manual Setup
+
 Before you run the service, you will need to set up environment variables.
 
 ```bash
